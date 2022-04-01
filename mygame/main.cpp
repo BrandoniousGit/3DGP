@@ -1,16 +1,22 @@
 // Tell system that SDL is already handled
 #define SDL_MAIN_HANDLED
+#define STB_IMAGE_IMPLEMENTATION
 
 // Graphics libraries
 #include "SDL2/SDL.h"
 #include "GL/glew.h"
+#include "wavefront/wavefront.h"
 
 // System libraries
+#include <glm/glm.hpp>
+#include <glm/ext.hpp>
 #include <stdexcept>
 #include <fstream>
 #include <istream>
 #include <iostream>
 #include <string>
+#include <vector>
+#include "stb_image.h"
 
 
 // Input file to return it as a string
@@ -50,6 +56,7 @@ int main()
 	}
 
 	// ======================================= Preparing the Primitive Shape Data ======================================
+
 	const GLfloat positions[] = {
 	  0.0f, 0.5f, 0.0f,
 	  -0.5f, -0.5f, 0.0f,
@@ -57,10 +64,10 @@ int main()
 	};
 
 	// RGBA - Vector 4
-	const GLfloat colours[] = {
-	  1.0f, 0.0f, 0.0f, 1.0f,
-	  0.0f, 1.0f, 0.0f, 1.0f,
-	  0.0f, 0.0f, 1.0f, 1.0f,
+	const GLfloat coords[] = {
+	  0.5f, 0.0f,
+	  0.0f, 1.0f,
+	  1.0f, 1.0f,
 	};
 
 	GLuint positionsVboId = 0;
@@ -124,10 +131,10 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, coloursVboId);
 
 	// Upload a copy of the data from memory into the new VBO
-	glBufferData(GL_ARRAY_BUFFER, sizeof(colours), colours, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(coords), coords, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE,
-		4 * sizeof(GLfloat), (void*)0);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE,
+		0, (void*)0);
 
 	glEnableVertexAttribArray(1);
 
@@ -135,8 +142,44 @@ int main()
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 
 	glBindVertexArray(0);
+	// ======================================= Texturing Triangle =======================================
 
-	// ====================================== = Preparing the Shader Program ======================================
+	int w = 0;
+	int h = 0;
+
+	unsigned char* data = stbi_load("image.png", &w, &h, NULL, 4);
+
+	if (!data)
+	{
+		throw std::exception();
+	}
+
+	// Create and bind a texture.
+	GLuint textureId = 0;
+	glGenTextures(1, &textureId);
+
+	if (!textureId)
+	{
+		throw std::exception();
+	}
+
+	glBindTexture(GL_TEXTURE_2D, textureId);
+
+	// Upload the image data to the bound texture unit in the GPU
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
+		GL_UNSIGNED_BYTE, data);
+
+	// Free the loaded data because we now have a copy on the GPU
+	free(data);
+
+	// Generate Mipmap so the texture can be mapped correctly
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	// Unbind the texture because we are done operating on it
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// ======================================= Preparing the Shader Program ======================================
+
 	std::string vertContent = getFileCode("resources/vertex.txt");
 	const GLchar* vertexShaderSrc = vertContent.c_str();
 	// Create a new vertex shader, attach source code, compile it and
@@ -174,9 +217,8 @@ int main()
 
 	// Ensure the VAO "position" attribute stream gets set as the first position
 	// during the link.
-	glBindAttribLocation(programId, 0, "in_Position");
-
-	glBindAttribLocation(programId, 1, "in_Colour");
+	glBindAttribLocation(programId, 0, "a_Position");
+	glBindAttribLocation(programId, 1, "a_TexCoord");
 
 	// Perform the link and check for failure
 	glLinkProgram(programId);
@@ -194,9 +236,6 @@ int main()
 	glDetachShader(programId, fragmentShaderId);
 	glDeleteShader(fragmentShaderId);
 
-
-
-
 	bool quit = false;
 
 	while (!quit)
@@ -210,6 +249,22 @@ int main()
 				quit = true;
 			}
 		}
+
+
+		glEnable(GL_CULL_FACE);
+		// Drawing operation
+		glDisable(GL_CULL_FACE);
+
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		//glActiveTexture(GL_TEXTURE0 + 1);
+		glBindTexture(GL_TEXTURE_2D, textureId);
+
+		// Make sure current shader is bound
+		//glUniform1i(samplerLoc, 1);
 
 		// Clear red
 		glClearColor(1, 0, 0, 1);
