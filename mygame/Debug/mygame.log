@@ -1,2 +1,3 @@
 ﻿  main.cpp
+\\bournemouth.ac.uk\data\Student\Home\SciTech\s5312506\3D Graphics Programming\mygame\main.cpp(300,20): warning C4305:  '+=': truncation from 'double' to 'float'
   mygame.vcxproj -> \\bournemouth.ac.uk\data\Student\Home\SciTech\s5312506\3D Graphics Programming\Debug\mygame.exe

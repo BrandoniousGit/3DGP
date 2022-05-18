@@ -1,6 +1,6 @@
 // Tell system that SDL is already handled
 #define SDL_MAIN_HANDLED
-#define STB_IMAGE_IMPLEMENTATION
+//#define STB_IMAGE_IMPLEMENTATION
 
 // Graphics libraries
 #include "SDL2/SDL.h"
@@ -10,6 +10,8 @@
 // System libraries
 #include <glm/glm.hpp>
 #include <glm/ext.hpp>
+#include <glm/fwd.hpp>
+#include <glm/gtx/compatibility.hpp>
 #include <stdexcept>
 #include <fstream>
 #include <istream>
@@ -54,6 +56,12 @@ int main()
 	{
 		throw std::runtime_error("Failed to create OpenGL context");
 	}
+
+	// ======================================= Render Curuthers the Cat =======================================
+
+	WfModel cat = {0};
+
+	WfModelLoad("curuthers/curuthers.obj", &cat);
 
 	// ======================================= Preparing the Primitive Shape Data ======================================
 
@@ -114,8 +122,6 @@ int main()
 	
 	//MATRIX
 
-
-
 	// COLOURS
 
 	GLuint coloursVboId = 0;
@@ -147,12 +153,19 @@ int main()
 	int w = 0;
 	int h = 0;
 
-	unsigned char* data = stbi_load("image.png", &w, &h, NULL, 4);
+	//glm::mat4 model, projection, cam;
+   // projection = glm::perspective(glm::radians(70.0f), (float)800 / (float)600, 0.1f, 100.0f);
+	//cam = glm::mat4(1.0f);
+	//cam = glm::translate(cam, -glm::vec3(0.0f, 0.0f, 0.0f));
+
+	//model = glm::translate(model, glm::vec3(1.0f, 0.0f, 10.0f));
+
+	/*unsigned char* data = stbi_load("image.png", &w, &h, NULL, 4);
 
 	if (!data)
 	{
 		throw std::exception();
-	}
+	}*/
 
 	// Create and bind a texture.
 	GLuint textureId = 0;
@@ -166,11 +179,11 @@ int main()
 	glBindTexture(GL_TEXTURE_2D, textureId);
 
 	// Upload the image data to the bound texture unit in the GPU
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
-		GL_UNSIGNED_BYTE, data);
+	/*glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA,
+		GL_UNSIGNED_BYTE, data);*/
 
 	// Free the loaded data because we now have a copy on the GPU
-	free(data);
+	//free(data);
 
 	// Generate Mipmap so the texture can be mapped correctly
 	glGenerateMipmap(GL_TEXTURE_2D);
@@ -180,7 +193,7 @@ int main()
 
 	// ======================================= Preparing the Shader Program ======================================
 
-	std::string vertContent = getFileCode("resources/vertex.txt");
+	std::string vertContent = getFileCode("resources/light.vert");
 	const GLchar* vertexShaderSrc = vertContent.c_str();
 	// Create a new vertex shader, attach source code, compile it and
 	// check for errors.
@@ -195,7 +208,7 @@ int main()
 		throw std::exception();
 	}
 
-	std::string fragmentShaderfile = getFileCode("resources/fragmentShader.txt");
+	std::string fragmentShaderfile = getFileCode("resources/light.frag");
 	const GLchar* fragmentShaderSrc = fragmentShaderfile.c_str();
 
 	// Create a new fragment shader, attach source code, compile it and
@@ -219,6 +232,7 @@ int main()
 	// during the link.
 	glBindAttribLocation(programId, 0, "a_Position");
 	glBindAttribLocation(programId, 1, "a_TexCoord");
+	glBindAttribLocation(programId, 2, "a_Normal");
 
 	// Perform the link and check for failure
 	glLinkProgram(programId);
@@ -236,10 +250,24 @@ int main()
 	glDetachShader(programId, fragmentShaderId);
 	glDeleteShader(fragmentShaderId);
 
+	GLuint projectionLoc = glGetUniformLocation(programId, "u_Projection");
+	GLuint viewLoc = glGetUniformLocation(programId, "u_View");
+	GLuint modelLoc = glGetUniformLocation(programId, "u_Model");
+
 	bool quit = false;
+
+	glm::vec3 cat1Pos, cat2Pos, camPos, camOffset;
+
+	cat1Pos = glm::vec3(-2.5f, 0.0f, -10.0f);
+	cat2Pos = glm::vec3(2.5f, 0.0f, -10.0f);
+	camOffset = glm::vec3(0.0f, 0.5f, 10.0f);
+
+	float timeInAir = 0;
+	bool canJump = true;
 
 	while (!quit)
 	{
+		const Uint8* Keystate = SDL_GetKeyboardState(NULL);
 		SDL_Event event = { 0 };
 
 		while (SDL_PollEvent(&event))
@@ -250,6 +278,55 @@ int main()
 			}
 		}
 
+		if (Keystate[SDL_SCANCODE_D])
+		{
+			cat1Pos += glm::vec3(0.05f, 0.0f, 0.0f);
+		}
+		if (Keystate[SDL_SCANCODE_A])
+		{
+			cat1Pos += glm::vec3(-0.05f, 0.0f, 0.0f);
+		}
+		if (Keystate[SDL_SCANCODE_S])
+		{
+			camOffset += glm::vec3(0.0f, 0.0f, 0.5f);
+		}
+		if (Keystate[SDL_SCANCODE_W])
+		{
+			camOffset += glm::vec3(0.0f, 0.0f, -0.5f);
+		}
+		if (Keystate[SDL_SCANCODE_SPACE] && timeInAir < 1.5 && canJump == true)
+		{
+			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 4, cat1Pos.z), 0.1f);
+			timeInAir += 0.1;
+		}
+		else
+		{
+			canJump = false;
+			timeInAir = 0;
+			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.1f);
+		}
+		if (timeInAir >= 1.5)
+		{
+			canJump = false;
+			timeInAir = 0;
+			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.1f);
+		}
+
+		if (cat1Pos.y <= 0.2)
+		{
+			canJump = true;
+		}
+
+		if (camOffset.z <= 5)
+		{
+			camOffset = glm::vec3(camOffset.x, camOffset.y, 5.0f);
+		}
+		if (camOffset.z >= 15)
+		{
+			camOffset = glm::vec3(camOffset.x, camOffset.y, 15.0f);
+		}
+
+		camPos = cat1Pos + camOffset;
 
 		glEnable(GL_CULL_FACE);
 		// Drawing operation
@@ -261,23 +338,70 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//glActiveTexture(GL_TEXTURE0 + 1);
-		glBindTexture(GL_TEXTURE_2D, textureId);
+		glBindTexture(GL_TEXTURE_2D, cat.textureId);
 
 		// Make sure current shader is bound
 		//glUniform1i(samplerLoc, 1);
 
 		// Clear red
-		glClearColor(1, 0, 0, 1);
+		glClearColor(0, 1, 1, 1);
 		glClear(GL_COLOR_BUFFER_BIT);
 		// Update buffers
 
 		// ======================================= SUBMIT FOR DRAWING ======================================
 		// Instruct OpenGL to use our shader program and our VAO
-		glUseProgram(programId);
-		glBindVertexArray(vaoId);
 
-		// Draw 3 vertices (a triangle)
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		//Cat 1
+
+		glUseProgram(programId);
+
+		glm::quat cat1Rot = glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)));
+
+		glm::mat4 projection = glm::perspective(glm::radians(70.0f), (float)800 / (float)600, 0.1f, 1000.0f);
+		glm::mat4 cam = glm::mat4(1.0f);
+		glm::mat4 model = glm::mat4(1.0f);
+
+		cam = glm::translate(cam, -camPos);
+
+		//Rotate the model
+		model = glm::translate(model, cat1Pos);
+		model = model * glm::mat4_cast(cat1Rot);
+
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(cam));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+		glBindVertexArray(cat.vaoId);
+
+		glEnable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, cat.vertexCount);
+		glDisable(GL_DEPTH_TEST);
+
+		// Reset the state
+		glBindVertexArray(0);
+		glUseProgram(0);
+
+		//Cat 2
+
+		glUseProgram(programId);
+
+		glm::quat cat2Rot = glm::quat(glm::radians(glm::vec3(0.0f, -90.0f, 0.0f)));
+
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, cat2Pos);
+
+		//Rotate the model
+		model = model * glm::mat4_cast(cat2Rot);
+
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(cam));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+		glBindVertexArray(cat.vaoId);
+
+		glEnable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, cat.vertexCount);
+		glDisable(GL_DEPTH_TEST);
 
 		// Reset the state
 		glBindVertexArray(0);
