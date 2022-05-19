@@ -39,6 +39,39 @@ std::string getFileCode(std::string fileName)
 	return fileContent;
 }
 
+GLuint createFloor(const std::string& filePath)
+{
+	int w = 0;
+	int h = 0;
+
+	unsigned char* data = stbi_load(filePath.c_str(), &w, &h, NULL, 4);
+	
+	if (!data)
+	{
+		throw std::runtime_error("It brokey data");
+	}
+
+	GLuint textId = 0;
+	glGenTextures(1, &textId);
+
+	if (!textId)
+	{
+		throw std::runtime_error("It brokey textId");
+	}
+
+	glBindTexture(GL_TEXTURE_2D, textId);
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+	free(data);
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	return textId;
+}
+
 int main()
 {
 
@@ -59,9 +92,15 @@ int main()
 
 	// ======================================= Render Curuthers the Cat =======================================
 
-	WfModel cat = {0};
+	WfModel cat = { 0 };
 
 	WfModelLoad("curuthers/curuthers.obj", &cat);
+
+	WfModel floor = { 0 };
+
+	WfModelLoad("floor/WelcomeMatOBJ.obj", &floor);
+
+	floor.textureId = createFloor("floor/Textures/WelcomeMatClear_diffuse.jpg");
 
 	// ======================================= Preparing the Primitive Shape Data ======================================
 
@@ -256,10 +295,11 @@ int main()
 
 	bool quit = false;
 
-	glm::vec3 cat1Pos, cat2Pos, camPos, camOffset;
+	glm::vec3 cat1Pos, cat2Pos, camPos, camOffset, floorPos;
 
 	cat1Pos = glm::vec3(-2.5f, 0.0f, -10.0f);
-	cat2Pos = glm::vec3(2.5f, 0.0f, -10.0f);
+	cat2Pos = glm::vec3(5.0f, -3.33f, -11.0f);
+	floorPos = glm::vec3(0.0f, -4.5f, -10.0f);
 	camOffset = glm::vec3(0.0f, 0.5f, 10.0f);
 
 	float timeInAir = 0;
@@ -278,14 +318,24 @@ int main()
 			}
 		}
 
-		if (Keystate[SDL_SCANCODE_D])
+		cat2Pos += glm::vec3(-0.15f, 0, 0);
+
+		if (cat2Pos.x <= -20.0f)
+		{
+			cat2Pos = glm::vec3(10.0f, cat2Pos.y, cat2Pos.z);
+		}
+
+		//For moving the player left and right
+		/*if (Keystate[SDL_SCANCODE_D])
 		{
 			cat1Pos += glm::vec3(0.05f, 0.0f, 0.0f);
 		}
 		if (Keystate[SDL_SCANCODE_A])
 		{
 			cat1Pos += glm::vec3(-0.05f, 0.0f, 0.0f);
-		}
+		}*/
+
+		//For zooming the camera in and out
 		if (Keystate[SDL_SCANCODE_S])
 		{
 			camOffset += glm::vec3(0.0f, 0.0f, 0.5f);
@@ -294,7 +344,9 @@ int main()
 		{
 			camOffset += glm::vec3(0.0f, 0.0f, -0.5f);
 		}
-		if (Keystate[SDL_SCANCODE_SPACE] && timeInAir < 1.5 && canJump == true)
+
+		//Jumping using lerp
+		if (Keystate[SDL_SCANCODE_SPACE] && timeInAir < 2.4 && canJump == true)
 		{
 			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 4, cat1Pos.z), 0.1f);
 			timeInAir += 0.1;
@@ -303,13 +355,13 @@ int main()
 		{
 			canJump = false;
 			timeInAir = 0;
-			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.1f);
+			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.07f);
 		}
-		if (timeInAir >= 1.5)
+		if (timeInAir >= 2.4)
 		{
 			canJump = false;
 			timeInAir = 0;
-			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.1f);
+			cat1Pos = glm::lerp(cat1Pos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), 0.07f);
 		}
 
 		if (cat1Pos.y <= 0.2)
@@ -385,10 +437,12 @@ int main()
 
 		glUseProgram(programId);
 
-		glm::quat cat2Rot = glm::quat(glm::radians(glm::vec3(0.0f, -90.0f, 0.0f)));
+		glm::quat cat2Rot = glm::quat(glm::radians(glm::vec3(0.0f, -70.0f, -90.0f)));
+		glm::vec3 cat2Scale = glm::vec3(2.0f, 2.0f, 2.0f);
 
 		model = glm::mat4(1.0f);
 		model = glm::translate(model, cat2Pos);
+		model = glm::scale(model, cat2Scale);
 
 		//Rotate the model
 		model = model * glm::mat4_cast(cat2Rot);
@@ -401,6 +455,27 @@ int main()
 
 		glEnable(GL_DEPTH_TEST);
 		glDrawArrays(GL_TRIANGLES, 0, cat.vertexCount);
+		glDisable(GL_DEPTH_TEST);
+
+		// Reset the state
+		glBindVertexArray(0);
+		glUseProgram(0);
+
+		//Floor
+		glUseProgram(programId);
+		glBindTexture(GL_TEXTURE_2D, floor.textureId);
+
+		model = glm::mat4(1.0f);
+		model = glm::translate(model, floorPos);
+
+		glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projection));
+		glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(cam));
+		glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+		glBindVertexArray(floor.vaoId);
+
+		glEnable(GL_DEPTH_TEST);
+		glDrawArrays(GL_TRIANGLES, 0, floor.vertexCount);
 		glDisable(GL_DEPTH_TEST);
 
 		// Reset the state
