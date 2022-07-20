@@ -297,18 +297,23 @@ int main()
 
 	glm::vec3 cat1Pos, cat2Pos, camPos, camOffset, floorPos;
 
-	cat1Pos = glm::vec3(-2.5f, 0.0f, -10.0f);
-	cat2Pos = glm::vec3(5.0f, -3.33f, -11.0f);
+	glm::quat camRot = glm::quat(glm::radians(glm::vec3(0.0f, 0.0f, 0.0f)));
+
+	//cat1Pos = glm::vec3(-2.5f, 0.0f, -10.0f);
+	cat1Pos = glm::vec3(0.0f, 0.0f, 0.0f);
+	cat2Pos = glm::vec3(0.0f, -3.33f, -1.0f);
 	floorPos = glm::vec3(0.0f, -4.5f, -10.0f);
-	camOffset = glm::vec3(0.0f, 0.5f, 10.0f);
+	camOffset = glm::vec3(0.0f, 0.0f, 0.0f);
 
 	float timeInAir = 0;
+	float angle = 0, offset = 10;
+
 	bool canJump = true;
 
 	while (!quit)
 	{
 		const Uint8* Keystate = SDL_GetKeyboardState(NULL);
-		SDL_Event event = { 0 };
+		SDL_Event event;
 
 		while (SDL_PollEvent(&event))
 		{
@@ -335,15 +340,25 @@ int main()
 			cat1Pos += glm::vec3(-0.05f, 0.0f, 0.0f);
 		}*/
 
+		//camRot *= glm::quat(glm::radians(glm::vec3(0.0f, glm::radians(-55.0f), 0.0f)));
+
 		//For zooming the camera in and out
 		if (Keystate[SDL_SCANCODE_S])
 		{
-			camOffset += glm::vec3(0.0f, 0.0f, 0.5f);
+			offset += 0.1f;
 		}
 		if (Keystate[SDL_SCANCODE_W])
 		{
-			camOffset += glm::vec3(0.0f, 0.0f, -0.5f);
+			offset -= 0.1f;
 		}
+
+		//Holding the "O" key will orbit the cat model
+		if (Keystate[SDL_SCANCODE_O])
+		{
+			angle += 1.0f;
+		}
+
+		camOffset = glm::vec3(sin(glm::radians(angle)) * offset, 0.0f, cos(glm::radians(angle)) * offset);
 
 		//Jumping using lerp
 		if (Keystate[SDL_SCANCODE_SPACE] && timeInAir < 2.4 && canJump == true)
@@ -369,16 +384,19 @@ int main()
 			canJump = true;
 		}
 
-		if (camOffset.z <= 5)
+
+		//Locking the camera offset between 5 and 15 units
+		if (offset <= 5)
 		{
-			camOffset = glm::vec3(camOffset.x, camOffset.y, 5.0f);
+			offset = 5;
 		}
-		if (camOffset.z >= 15)
+		if (offset >= 15)
 		{
-			camOffset = glm::vec3(camOffset.x, camOffset.y, 15.0f);
+			offset = 15;
 		}
 
-		camPos = cat1Pos + camOffset;
+		//Applying the camera position
+		camPos = camOffset + glm::vec3(cat1Pos.x, 0, cat1Pos.z);
 
 		glEnable(GL_CULL_FACE);
 		// Drawing operation
@@ -413,6 +431,8 @@ int main()
 		glm::mat4 cam = glm::mat4(1.0f);
 		glm::mat4 model = glm::mat4(1.0f);
 
+		//cam = cam * glm::mat4_cast(camRot);
+		cam = glm::lookAt(camPos, glm::vec3(cat1Pos.x, 0, cat1Pos.z), glm::vec3(0.0f, 1.0f, 0.0f));
 		cam = glm::translate(cam, -camPos);
 
 		//Rotate the model
