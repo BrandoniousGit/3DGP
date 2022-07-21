@@ -20,6 +20,7 @@
 #include <vector>
 #include "stb_image.h"
 
+#include "shader.h"
 
 // Input file to return it as a string
 std::string getFileCode(std::string fileName)
@@ -232,66 +233,11 @@ int main()
 
 	// ======================================= Preparing the Shader Program ======================================
 
-	std::string vertContent = getFileCode("resources/light.vert");
-	const GLchar* vertexShaderSrc = vertContent.c_str();
-	// Create a new vertex shader, attach source code, compile it and
-	// check for errors.
-	GLuint vertexShaderId = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShaderId, 1, &vertexShaderSrc, NULL);
-	glCompileShader(vertexShaderId);
-	GLint success = 0;
-	glGetShaderiv(vertexShaderId, GL_COMPILE_STATUS, &success);
+	Shader shader("resources/light.vert", "resources/light.frag");
 
-	if (!success)
-	{
-		throw std::exception();
-	}
-
-	std::string fragmentShaderfile = getFileCode("resources/light.frag");
-	const GLchar* fragmentShaderSrc = fragmentShaderfile.c_str();
-
-	// Create a new fragment shader, attach source code, compile it and
-	// check for errors.
-	GLuint fragmentShaderId = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShaderId, 1, &fragmentShaderSrc, NULL);
-	glCompileShader(fragmentShaderId);
-	glGetShaderiv(fragmentShaderId, GL_COMPILE_STATUS, &success);
-
-	if (!success)
-	{
-		throw std::exception();
-	}
-
-	// Create new shader program and attach our shader objects
-	GLuint programId = glCreateProgram();
-	glAttachShader(programId, vertexShaderId);
-	glAttachShader(programId, fragmentShaderId);
-
-	// Ensure the VAO "position" attribute stream gets set as the first position
-	// during the link.
-	glBindAttribLocation(programId, 0, "a_Position");
-	glBindAttribLocation(programId, 1, "a_TexCoord");
-	glBindAttribLocation(programId, 2, "a_Normal");
-
-	// Perform the link and check for failure
-	glLinkProgram(programId);
-	glGetProgramiv(programId, GL_LINK_STATUS, &success);
-
-	if (!success)
-	{
-		throw std::exception();
-	}
-
-	// Detach and destroy the shader objects. These are no longer needed
-	// because we now have a complete shader program.
-	glDetachShader(programId, vertexShaderId);
-	glDeleteShader(vertexShaderId);
-	glDetachShader(programId, fragmentShaderId);
-	glDeleteShader(fragmentShaderId);
-
-	GLuint projectionLoc = glGetUniformLocation(programId, "u_Projection");
-	GLuint viewLoc = glGetUniformLocation(programId, "u_View");
-	GLuint modelLoc = glGetUniformLocation(programId, "u_Model");
+	GLuint projectionLoc = glGetUniformLocation(shader.getProgId(), "u_Projection");
+	GLuint viewLoc = glGetUniformLocation(shader.getProgId(), "u_View");
+	GLuint modelLoc = glGetUniformLocation(shader.getProgId(), "u_Model");
 
 	bool quit = false;
 
@@ -423,7 +369,7 @@ int main()
 
 		//Cat 1
 
-		glUseProgram(programId);
+		glUseProgram(shader.getProgId());
 
 		glm::quat cat1Rot = glm::quat(glm::radians(glm::vec3(0.0f, 90.0f, 0.0f)));
 
@@ -455,7 +401,7 @@ int main()
 
 		//Cat 2
 
-		glUseProgram(programId);
+		glUseProgram(shader.getProgId());
 
 		glm::quat cat2Rot = glm::quat(glm::radians(glm::vec3(0.0f, -70.0f, -90.0f)));
 		glm::vec3 cat2Scale = glm::vec3(2.0f, 2.0f, 2.0f);
@@ -482,7 +428,7 @@ int main()
 		glUseProgram(0);
 
 		//Floor
-		glUseProgram(programId);
+		glUseProgram(shader.getProgId());
 		glBindTexture(GL_TEXTURE_2D, floor.textureId);
 
 		model = glm::mat4(1.0f);
